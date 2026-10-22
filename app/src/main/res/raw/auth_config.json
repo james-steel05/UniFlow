@@ -1,0 +1,16 @@
+{
+  "client_id": "635c253f-70ec-468a-a936-53aa8514bf9f",
+  "authorization_user_agent": "DEFAULT",
+  "redirect_uri": "msauth://com.example.uniflow/NcsrH3bw6fAfuxfLPJCZSZ6nvlc%3D",
+  "broker_redirect_uri_registered": false,
+  "account_mode": "SINGLE",
+  "authorities": [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADandPersonalMicrosoftAccount",
+        "tenant_id": "common"
+      }
+    }
+  ]
+}
