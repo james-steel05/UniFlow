@@ -8,7 +8,9 @@
         android:allowBackup="true"
         android:label="UniFlow"
         android:supportsRtl="true"
-        android:theme="@style/Theme.UniFlow">
+        android:theme="@style/Theme.UniFlow"
+        android:usesCleartextTraffic="true">
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

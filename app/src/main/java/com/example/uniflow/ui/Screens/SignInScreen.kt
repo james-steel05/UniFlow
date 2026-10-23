@@ -4,7 +4,7 @@ import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -15,12 +15,17 @@ import com.example.uniflow.ui.Routes
 import com.microsoft.identity.client.AuthenticationCallback
 import com.microsoft.identity.client.IAuthenticationResult
 import com.microsoft.identity.client.exception.MsalException
+import com.example.uniflow.data.local.AppDatabase
+import com.example.uniflow.data.repository.ModuleRepository
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 // Login screen with Microsoft SSO button
 @Composable
 fun SignInScreen(navController: NavHostController) {
     val context = LocalContext.current
     val activity = context as? Activity
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -38,6 +43,7 @@ fun SignInScreen(navController: NavHostController) {
             onClick = {
                 val app = MainActivity.mSingleAccountApp
                 if (app != null && activity != null) {
+                    Log.d("MSAL_DEBUG", "Sign-in button clicked: App instance is available.")
                     val scopes = arrayOf("User.Read")
 
                     // Trigger the interactive Microsoft login flow
@@ -49,13 +55,20 @@ fun SignInScreen(navController: NavHostController) {
                             override fun onSuccess(authenticationResult: IAuthenticationResult) {
                                 val account = authenticationResult.account
                                 val username = account.username
+                                // Get the access token issued by Microsoft Entra ID
+                                val accessToken = authenticationResult.accessToken
 
-                                // Fixed: using getClaims() to retrieve the map of token claims
+                                scope.launch {
+                                    val appContext = context.applicationContext
+                                    val database = AppDatabase.getDatabase(appContext)
+                                    val repository = ModuleRepository(database.moduleDao())
+
+                                    repository.syncModulesFromLms(username, accessToken)
+                                }
+
                                 val name = account.getClaims()?.get("name")?.toString() ?: username
-
                                 Log.d("MSAL", "Successfully signed in as: $name")
 
-                                // Navigate to home and clear the login screen from the back stack
                                 navController.navigate(Routes.HOME) {
                                     popUpTo(Routes.SIGN_IN) { inclusive = true }
                                 }
@@ -71,6 +84,7 @@ fun SignInScreen(navController: NavHostController) {
                         }
                     )
                 } else {
+                    Log.e("MSAL_DEBUG", "Sign-in button clicked: App instance is NULL. app=${app}, activity=${activity}")
                     Log.w("MSAL", "MSAL app instance is not initialized yet.")
                 }
             },

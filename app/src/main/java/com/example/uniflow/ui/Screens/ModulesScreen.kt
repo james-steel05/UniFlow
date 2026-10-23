@@ -23,33 +23,42 @@ fun ModulesScreen(
     navController: NavHostController,
     viewModel: ModulesViewModel = viewModel() // Get the ViewModel
 ) {
-    // Observe the database list
+    // Observe the database list and loading state
     val modules by viewModel.modules.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Modules") }) },
         bottomBar = { BottomBar(navController, Routes.MODULES) }
     ) { padding ->
-        if (modules.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(modules, key = { it.moduleCode }) { module ->
-                    ModuleCard(
-                        module = module,
-                        onFavouriteClick = {
-                            viewModel.toggleFavourite(module.moduleCode, module.isFavourite)
-                        },
-                        onClick = { navController.navigate(Routes.MODULE_DETAIL) }
-                    )
+            modules.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text(text = "No modules found for your account.", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(modules, key = { it.moduleCode }) { module ->
+                        ModuleCard(
+                            module = module,
+                            onFavouriteClick = {
+                                viewModel.toggleFavourite(module.moduleCode, module.isFavourite)
+                            },
+                            onClick = { navController.navigate(Routes.MODULE_DETAIL) }
+                        )
+                    }
                 }
             }
         }
