@@ -16,7 +16,17 @@ class ModuleRepository(
         try {
             val remoteModules = remoteDataSource.fetchUserModules(userEmail, idToken)
             if (remoteModules.isNotEmpty()) {
-                moduleDao.insertOrUpdateModulesPreservingFavorites(remoteModules)
+                // Process the modules one by one to protect favorites
+                for (module in remoteModules) {
+                    val existing = moduleDao.getModuleByCode(module.moduleCode)
+                    if (existing != null) {
+                        // If it exists, keep the local favorite status and update the rest
+                        moduleDao.insertModule(module.copy(isFavourite = existing.isFavourite))
+                    } else {
+                        // If it's new, insert it as is
+                        moduleDao.insertModule(module)
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

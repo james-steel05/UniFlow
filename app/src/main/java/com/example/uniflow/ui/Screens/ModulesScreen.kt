@@ -18,10 +18,12 @@ import com.example.uniflow.data.local.ModuleEntity
 import com.example.uniflow.ui.Routes
 import com.example.uniflow.ui.components.BottomBar
 
+// Added the OptIn annotation to fix the TopAppBar error
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModulesScreen(
     navController: NavHostController,
-    viewModel: ModulesViewModel = viewModel() // Get the ViewModel
+    viewModel: ModulesViewModel = viewModel()
 ) {
     // Observe the database list and loading state
     val modules by viewModel.modules.collectAsState()
@@ -56,7 +58,10 @@ fun ModulesScreen(
                             onFavouriteClick = {
                                 viewModel.toggleFavourite(module.moduleCode, module.isFavourite)
                             },
-                            onClick = { navController.navigate(Routes.MODULE_DETAIL) }
+                            // FIXED: Added the specific module code to the route
+                            onClick = {
+                                navController.navigate("module_detail/${module.moduleCode}")
+                            }
                         )
                     }
                 }

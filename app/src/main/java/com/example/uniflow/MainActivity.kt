@@ -14,13 +14,7 @@ import com.example.uniflow.data.local.AppDatabase
 import com.example.uniflow.data.repository.ModuleRepository
 import com.example.uniflow.ui.AppNavHost
 import com.example.uniflow.ui.Routes
-import com.microsoft.identity.client.AcquireTokenSilentParameters
-import com.microsoft.identity.client.IAccount
-import com.microsoft.identity.client.IAuthenticationResult
-import com.microsoft.identity.client.IPublicClientApplication
-import com.microsoft.identity.client.ISingleAccountPublicClientApplication
-import com.microsoft.identity.client.PublicClientApplication
-import com.microsoft.identity.client.SilentAuthenticationCallback
+import com.microsoft.identity.client.*
 import com.microsoft.identity.client.exception.MsalException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +25,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         var mSingleAccountApp: ISingleAccountPublicClientApplication? = null
             private set
+        var currentAccessToken: String? = null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +57,13 @@ class MainActivity : ComponentActivity() {
                                     .withCallback(object : SilentAuthenticationCallback {
                                         override fun onSuccess(authenticationResult: IAuthenticationResult) {
                                             val accessToken = authenticationResult.accessToken
+
+                                            // 2. Save the token globally
+                                            currentAccessToken = accessToken
+
+                                            // 3. Move the user to the Timetable screen
+                                            startDestination = Routes.TIMETABLE
+
                                             CoroutineScope(Dispatchers.IO).launch {
                                                 try {
                                                     val database = AppDatabase.getDatabase(applicationContext)
@@ -75,6 +77,10 @@ class MainActivity : ComponentActivity() {
 
                                         override fun onError(exception: MsalException) {
                                             Log.e("MSAL_DEBUG", "Silent token acquisition failed", exception)
+
+                                            // Even if the token fails, if they have an account, let them in
+                                            startDestination = Routes.TIMETABLE
+
                                             CoroutineScope(Dispatchers.IO).launch {
                                                 try {
                                                     val database = AppDatabase.getDatabase(applicationContext)
@@ -88,8 +94,9 @@ class MainActivity : ComponentActivity() {
                                     })
                                     .build()
 
+                                // Execute the silent request
                                 application.acquireTokenSilentAsync(silentParams)
-                                startDestination = Routes.HOME
+
                             } else {
                                 Log.d("MSAL_DEBUG", "No active account. Showing Sign In.")
                                 startDestination = Routes.SIGN_IN
@@ -119,6 +126,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val destination = startDestination
+                    // 4. Only show the app once we know if they are logged in or not
                     if (destination != null) {
                         val navController = rememberNavController()
                         AppNavHost(navController = navController, startDestination = destination)

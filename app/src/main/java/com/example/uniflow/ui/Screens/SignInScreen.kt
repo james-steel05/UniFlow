@@ -1,6 +1,5 @@
 package com.example.uniflow.ui.screens
 
-import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -14,18 +13,14 @@ import com.example.uniflow.MainActivity
 import com.example.uniflow.ui.Routes
 import com.microsoft.identity.client.AuthenticationCallback
 import com.microsoft.identity.client.IAuthenticationResult
+import com.microsoft.identity.client.SignInParameters
 import com.microsoft.identity.client.exception.MsalException
-import com.example.uniflow.data.local.AppDatabase
-import com.example.uniflow.data.repository.ModuleRepository
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 
-// Login screen with Microsoft SSO button
 @Composable
 fun SignInScreen(navController: NavHostController) {
-    val context = LocalContext.current
-    val activity = context as? Activity
-    val scope = rememberCoroutineScope()
+    var isLoggingIn by remember { mutableStateOf(false) }
+    // Get the current Activity context required by MSAL
+    val activity = LocalContext.current as android.app.Activity
 
     Column(
         modifier = Modifier
@@ -41,56 +36,59 @@ fun SignInScreen(navController: NavHostController) {
 
         Button(
             onClick = {
+                isLoggingIn = true
                 val app = MainActivity.mSingleAccountApp
-                if (app != null && activity != null) {
-                    Log.d("MSAL_DEBUG", "Sign-in button clicked: App instance is available.")
-                    val scopes = arrayOf("User.Read")
 
-                    // Trigger the interactive Microsoft login flow
-                    app.signIn(
-                        activity,
-                        null,
-                        scopes,
-                        object : AuthenticationCallback {
-                            override fun onSuccess(authenticationResult: IAuthenticationResult) {
-                                val account = authenticationResult.account
-                                val username = account.username
-                                // Get the access token issued by Microsoft Entra ID
-                                val accessToken = authenticationResult.accessToken
+                if (app == null) {
+                    Log.e("MSAL_DEBUG", "MSAL app not initialized yet")
+                    isLoggingIn = false
+                    return@Button
+                }
 
-                                scope.launch {
-                                    val appContext = context.applicationContext
-                                    val database = AppDatabase.getDatabase(appContext)
-                                    val repository = ModuleRepository(database.moduleDao())
+                // Use SignInParameters.builder() to avoid compiler errors
+                val params = SignInParameters.builder()
+                    .withActivity(activity)
+                    .withScopes(listOf("User.Read"))
+                    .withCallback(object : AuthenticationCallback {
+                        override fun onSuccess(authenticationResult: IAuthenticationResult?) {
+                            authenticationResult?.let { result ->
+                                // Save the token globally so ProfileScreen can use it
+                                MainActivity.currentAccessToken = result.accessToken
 
-                                    repository.syncModulesFromLms(username, accessToken)
-                                }
-
-                                val name = account.getClaims()?.get("name")?.toString() ?: username
-                                Log.d("MSAL", "Successfully signed in as: $name")
-
-                                navController.navigate(Routes.HOME) {
+                                // Navigate to Timetable and clear the backstack
+                                navController.navigate(Routes.TIMETABLE) {
                                     popUpTo(Routes.SIGN_IN) { inclusive = true }
                                 }
                             }
-
-                            override fun onError(exception: MsalException) {
-                                Log.e("MSAL", "Authentication failed: ${exception.message}", exception)
-                            }
-
-                            override fun onCancel() {
-                                Log.d("MSAL", "User cancelled the sign-in flow.")
-                            }
+                            isLoggingIn = false
                         }
-                    )
-                } else {
-                    Log.e("MSAL_DEBUG", "Sign-in button clicked: App instance is NULL. app=${app}, activity=${activity}")
-                    Log.w("MSAL", "MSAL app instance is not initialized yet.")
-                }
+
+                        override fun onError(exception: MsalException?) {
+                            Log.e("MSAL_DEBUG", "Login failed", exception)
+                            isLoggingIn = false
+                        }
+
+                        override fun onCancel() {
+                            Log.d("MSAL_DEBUG", "User cancelled login")
+                            isLoggingIn = false
+                        }
+                    })
+                    .build()
+
+                // Trigger the interactive Microsoft login popup
+                app.signIn(params)
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoggingIn
         ) {
-            Text("Sign in with Microsoft")
+            if (isLoggingIn) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Sign in with Microsoft")
+            }
         }
     }
 }
