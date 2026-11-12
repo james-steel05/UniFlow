@@ -7,7 +7,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-
 @Dao
 interface ModuleDao {
 
@@ -17,7 +16,8 @@ interface ModuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertModules(modules: List<ModuleEntity>)
 
-    @Query("SELECT * FROM modules ORDER BY moduleCode ASC")
+    // Sorts favourites to the top, then sorts alphabetically
+    @Query("SELECT * FROM modules ORDER BY isFavourite DESC, moduleName ASC")
     fun getAllModules(): Flow<List<ModuleEntity>>
 
     @Query("SELECT * FROM modules WHERE moduleCode = :code")
@@ -34,4 +34,10 @@ interface ModuleDao {
 
     @Query("DELETE FROM modules")
     suspend fun deleteAllModules()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertModuleContent(content: ModuleContentEntity)
+
+    @Query("SELECT * FROM module_content WHERE moduleCode = :code")
+    suspend fun getModuleContent(code: String): ModuleContentEntity?
 }

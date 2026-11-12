@@ -3,10 +3,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="UniFlow"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.UniFlow"
         android:usesCleartextTraffic="true">
@@ -33,6 +36,9 @@
                     android:scheme="msauth" />
             </intent-filter>
         </activity>
+
+        <!-- Receiver for alarms -->
+        <receiver android:name=".ClassReminderReceiver" />
 
     </application>
 

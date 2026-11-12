@@ -1,4 +1,4 @@
-package com.example.uniflow.ui.screens
+package com.example.uniflow.ui.Screens
 
 import android.util.Log
 import androidx.compose.foundation.layout.*

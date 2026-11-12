@@ -1,37 +1,41 @@
-package com.example.uniflow.ui.screens
+package com.example.uniflow.ui.Screens
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.uniflow.MainActivity
+import com.example.uniflow.data.local.SettingsManager
 import com.example.uniflow.ui.Routes
 import com.example.uniflow.ui.components.BottomBar
-import com.microsoft.identity.client.ISingleAccountPublicClientApplication
-import com.microsoft.identity.client.exception.MsalException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(
-    navController: NavHostController,
-    accessToken: String?, // Pass the token from MainActivity
-    viewModel: ProfileViewModel = viewModel()
-) {
-    val uiState by viewModel.uiState.collectAsState()
+fun ProfileScreen(navController: NavHostController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    // Trigger the fetch ONLY when the screen opens and a token exists
-    LaunchedEffect(accessToken) {
-        if (accessToken != null) {
-            viewModel.fetchUserProfile(accessToken)
-        } else {
-            // Optional: Handle the case where there is no token
-        }
-    }
+    // Collect the StateFlows from MainActivity
+    val userNameState by MainActivity.currentUserName.collectAsState()
+    val userEmailState by MainActivity.currentUserEmail.collectAsState()
+
+    // Use them with fallbacks
+    val displayName = userNameState ?: "Loading..."
+    val displayEmail = userEmailState ?: "Loading..."
+    val studentNumber = if (displayEmail != "Loading...") "EDUV" + displayEmail.hashCode().toString().takeLast(7) else "N/A"
+
+    val isDarkMode by SettingsManager.isDarkMode.collectAsState()
+    val notificationsEnabled by SettingsManager.notificationsEnabled.collectAsState()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Profile") }) },
@@ -42,58 +46,63 @@ fun ProfileScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            when (val state = uiState) {
-                is ProfileState.Loading -> {
-                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                is ProfileState.Error -> {
-                    Text(text = state.message, color = MaterialTheme.colorScheme.error)
-                }
-                is ProfileState.Success -> {
-                    Text(
-                        text = state.profile.displayName ?: "Unknown Name",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Text(text = state.profile.mail ?: state.profile.userPrincipalName ?: "No email found")
-                }
-            }
+            Text(displayName, style = MaterialTheme.typography.titleLarge)
+            Text("Student Number: $studentNumber", style = MaterialTheme.typography.bodyMedium)
+            Text(displayEmail, style = MaterialTheme.typography.bodyMedium)
 
             HorizontalDivider()
 
             Text("Preferences", style = MaterialTheme.typography.titleMedium)
-            Text("Theme: Light")
-            Text("Notifications: Enabled")
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Dark Mode")
+                Switch(
+                    checked = isDarkMode,
+                    onCheckedChange = { SettingsManager.setDarkMode(context, it) }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Notifications")
+                Switch(
+                    checked = notificationsEnabled,
+                    onCheckedChange = { SettingsManager.setNotifications(context, it) }
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // UPDATED: Actual MSAL Sign Out Logic
             Button(
                 onClick = {
-                    val app = MainActivity.mSingleAccountApp
-                    if (app != null) {
-                        app.signOut(object : ISingleAccountPublicClientApplication.SignOutCallback {
-                            override fun onSignOut() {
-                                // Clear the global token
-                                MainActivity.currentAccessToken = null
+                    scope.launch {
+                        try {
+                            // Clear variables
+                            MainActivity.updateUserData(null, null)
+                            MainActivity.currentAccessToken = null
 
-                                // Navigate back to Sign In and clear the backstack
+                            // Run signOut on background thread to prevent crash
+                            withContext(Dispatchers.IO) {
+                                MainActivity.mSingleAccountApp?.signOut()
+                            }
+
+                            // Navigate back to Sign In
+                            withContext(Dispatchers.Main) {
                                 navController.navigate(Routes.SIGN_IN) {
-                                    popUpTo(0) { inclusive = true }
+                                    popUpTo(Routes.SIGN_IN) { inclusive = true }
                                 }
                             }
-
-                            override fun onError(exception: MsalException) {
-                                Log.e("MSAL_DEBUG", "Sign out failed", exception)
-                            }
-                        })
-                    } else {
-                        // Fallback just in case MSAL isn't initialized
-                        navController.navigate(Routes.SIGN_IN) {
-                            popUpTo(0) { inclusive = true }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
                     }
                 },

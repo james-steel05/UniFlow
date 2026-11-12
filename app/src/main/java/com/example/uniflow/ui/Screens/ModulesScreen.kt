@@ -1,5 +1,7 @@
-package com.example.uniflow.ui.screens
+package com.example.uniflow.ui.Screens
 
+import android.app.Application
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,92 +13,100 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.uniflow.data.local.AppDatabase
 import com.example.uniflow.data.local.ModuleEntity
+import com.example.uniflow.data.repository.ModuleRepository
 import com.example.uniflow.ui.Routes
 import com.example.uniflow.ui.components.BottomBar
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-// Added the OptIn annotation to fix the TopAppBar error
+class ModulesViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: ModuleRepository
+
+    init {
+        val db = AppDatabase.getDatabase(application)
+        repository = ModuleRepository(db.moduleDao(), db.timetableDao())
+    }
+
+    val modules: StateFlow<List<ModuleEntity>> = repository.allModules
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun toggleFavourite(module: ModuleEntity) {
+        viewModelScope.launch {
+            repository.toggleFavourite(module.moduleCode, !module.isFavourite)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModulesScreen(
     navController: NavHostController,
     viewModel: ModulesViewModel = viewModel()
 ) {
-    // Observe the database list and loading state
     val modules by viewModel.modules.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Modules") }) },
+        topBar = { TopAppBar(title = { Text("My Modules") }) },
         bottomBar = { BottomBar(navController, Routes.MODULES) }
     ) { padding ->
-        when {
-            isLoading -> {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+        if (modules.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("No modules found. Pull to refresh or sync again.")
             }
-            modules.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Text(text = "No modules found for your account.", style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(modules, key = { it.moduleCode }) { module ->
-                        ModuleCard(
-                            module = module,
-                            onFavouriteClick = {
-                                viewModel.toggleFavourite(module.moduleCode, module.isFavourite)
-                            },
-                            // FIXED: Added the specific module code to the route
-                            onClick = {
-                                navController.navigate("module_detail/${module.moduleCode}")
+        } else {
+            LazyColumn(
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(modules, key = { it.moduleCode }) { module ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // CLEAN THE CODE: Remove spaces and parentheses to prevent navigation crashes
+                                val cleanCode = module.moduleCode
+                                    .replace(" (First Block)", "")
+                                    .replace(" (Second Block)", "")
+                                    .trim()
+
+                                // ENCODE THE URL: Just in case there are any other weird characters
+                                val encodedCode = Uri.encode(cleanCode)
+
+                                navController.navigate("module_detail/$encodedCode")
                             }
-                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = module.moduleName, style = MaterialTheme.typography.titleMedium)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(text = module.moduleCode, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = "Lecturer: ${module.lecturerName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+
+                            IconButton(onClick = { viewModel.toggleFavourite(module) }) {
+                                Icon(
+                                    imageVector = if (module.isFavourite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = "Favourite",
+                                    tint = if (module.isFavourite) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        }
-    }
-}
-
-// A helper Composable for the card
-@Composable
-fun ModuleCard(
-    module: ModuleEntity,
-    onFavouriteClick: () -> Unit,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "${module.moduleCode} - ${module.moduleName}", style = MaterialTheme.typography.titleMedium)
-                Text(text = module.lecturerName, style = MaterialTheme.typography.bodySmall)
-            }
-            IconButton(onClick = onFavouriteClick) {
-                Icon(
-                    imageVector = if (module.isFavourite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = "Favourite",
-                    tint = if (module.isFavourite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
             }
         }
     }

@@ -7,10 +7,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.uniflow.data.local.AppDatabase
+import com.example.uniflow.data.local.SettingsManager
 import com.example.uniflow.data.repository.ModuleRepository
 import com.example.uniflow.ui.AppNavHost
 import com.example.uniflow.ui.Routes
@@ -18,6 +21,8 @@ import com.microsoft.identity.client.*
 import com.microsoft.identity.client.exception.MsalException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -26,15 +31,29 @@ class MainActivity : ComponentActivity() {
         var mSingleAccountApp: ISingleAccountPublicClientApplication? = null
             private set
         var currentAccessToken: String? = null
+
+        // FIXED: Use StateFlow to guarantee UI updates
+        private val _currentUserName = MutableStateFlow<String?>(null)
+        val currentUserName: StateFlow<String?> = _currentUserName
+
+        private val _currentUserEmail = MutableStateFlow<String?>(null)
+        val currentUserEmail: StateFlow<String?> = _currentUserEmail
+
+        // Helper to update both at once
+        fun updateUserData(name: String?, email: String?) {
+            _currentUserName.value = name
+            _currentUserEmail.value = email
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d("MSAL_DEBUG", "MainActivity.onCreate started")
 
+        SettingsManager.init(this)
+
         var startDestination by mutableStateOf<String?>(null)
 
-        // Initialize MSAL asynchronously on startup
         PublicClientApplication.createSingleAccountPublicClientApplication(
             this,
             R.raw.auth_config,
@@ -43,11 +62,17 @@ class MainActivity : ComponentActivity() {
                     mSingleAccountApp = application
                     Log.d("MSAL_DEBUG", "MSAL onCreated: Initialization successful. Instance assigned.")
 
-                    // Check if an account is already signed in
                     application.getCurrentAccountAsync(object : ISingleAccountPublicClientApplication.CurrentAccountCallback {
                         override fun onAccountLoaded(activeAccount: IAccount?) {
                             if (activeAccount != null) {
                                 val username = activeAccount.username
+
+                                // Update the StateFlow immediately
+                                updateUserData(
+                                    name = username.substringBefore("@").replaceFirstChar { it.uppercase() },
+                                    email = username
+                                )
+
                                 Log.d("MSAL_DEBUG", "Found active user session: $username")
 
                                 val silentParams = AcquireTokenSilentParameters.Builder()
@@ -57,17 +82,13 @@ class MainActivity : ComponentActivity() {
                                     .withCallback(object : SilentAuthenticationCallback {
                                         override fun onSuccess(authenticationResult: IAuthenticationResult) {
                                             val accessToken = authenticationResult.accessToken
-
-                                            // 2. Save the token globally
                                             currentAccessToken = accessToken
-
-                                            // 3. Move the user to the Timetable screen
                                             startDestination = Routes.TIMETABLE
 
                                             CoroutineScope(Dispatchers.IO).launch {
                                                 try {
                                                     val database = AppDatabase.getDatabase(applicationContext)
-                                                    val repository = ModuleRepository(database.moduleDao())
+                                                    val repository = ModuleRepository(database.moduleDao(), database.timetableDao())
                                                     repository.syncModulesFromLms(username, accessToken)
                                                 } catch (e: Exception) {
                                                     e.printStackTrace()
@@ -77,14 +98,12 @@ class MainActivity : ComponentActivity() {
 
                                         override fun onError(exception: MsalException) {
                                             Log.e("MSAL_DEBUG", "Silent token acquisition failed", exception)
-
-                                            // Even if the token fails, if they have an account, let them in
                                             startDestination = Routes.TIMETABLE
 
                                             CoroutineScope(Dispatchers.IO).launch {
                                                 try {
                                                     val database = AppDatabase.getDatabase(applicationContext)
-                                                    val repository = ModuleRepository(database.moduleDao())
+                                                    val repository = ModuleRepository(database.moduleDao(), database.timetableDao())
                                                     repository.syncModulesFromLms(username, null)
                                                 } catch (e: Exception) {
                                                     e.printStackTrace()
@@ -94,7 +113,6 @@ class MainActivity : ComponentActivity() {
                                     })
                                     .build()
 
-                                // Execute the silent request
                                 application.acquireTokenSilentAsync(silentParams)
 
                             } else {
@@ -120,13 +138,16 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            MaterialTheme {
+            val isDarkMode by SettingsManager.isDarkMode.collectAsState()
+
+            MaterialTheme(
+                colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val destination = startDestination
-                    // 4. Only show the app once we know if they are logged in or not
                     if (destination != null) {
                         val navController = rememberNavController()
                         AppNavHost(navController = navController, startDestination = destination)

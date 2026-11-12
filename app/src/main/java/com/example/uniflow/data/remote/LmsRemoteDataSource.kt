@@ -1,61 +1,59 @@
 package com.example.uniflow.data.remote
 
-import com.example.uniflow.data.local.ModuleEntity
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 class LmsRemoteDataSource {
 
-    private val supabaseUrl = "https://nbwajoxxqvzoazjfpoac.supabase.co/rest/v1/modules"
+    private val supabaseUrl = "https://nbwajoxxqvzoazjfpoac.supabase.co/rest/v1/lms_html_content"
     private val apiKey = "sb_publishable_YlIsL-o8mphFyllUUZk_nA_khFFgut7"
 
-    suspend fun fetchUserModules(userEmail: String, idToken: String? = null): List<ModuleEntity> = withContext(Dispatchers.IO) {
-        Log.d("LMS_DEBUG", "Fetching modules for email: $userEmail")
-        val modulesList = mutableListOf<ModuleEntity>()
+    suspend fun fetchHtmlContent(userEmail: String, category: String, itemCode: String = "main"): String? = withContext(Dispatchers.IO) {
         try {
-            val url = URL("$supabaseUrl?user_email=eq.$userEmail")
+            val encodedEmail = URLEncoder.encode(userEmail, "UTF-8")
+            val encodedItemCode = URLEncoder.encode(itemCode, "UTF-8")
+
+            // Added item_code=eq.$encodedItemCode to the URL
+            val url = URL("$supabaseUrl?user_email=eq.$encodedEmail&category=eq.$category&item_code=eq.$encodedItemCode")
+
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("apikey", apiKey)
-                setRequestProperty("Authorization", "Bearer $apiKey")
-
-                if (!idToken.isNullOrEmpty()) {
-                    setRequestProperty("X-MSAL-Token", idToken)
-                }
-
+                setRequestProperty("Accept", "application/json")
                 connectTimeout = 10000
                 readTimeout = 10000
             }
 
             val responseCode = connection.responseCode
-            Log.d("LMS_DEBUG", "Supabase Response Code: $responseCode")
+            Log.d("LMS_DEBUG", "Fetching $category ($itemCode) -> Response Code: $responseCode")
 
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
-                Log.d("LMS_RESPONSE", "Raw JSON: $jsonResponse")
+
+                // THIS IS THE NEW LOG: It will print the exact response from Supabase
+                Log.d("LMS_DEBUG", "Raw Supabase Response: $jsonResponse")
 
                 val jsonArray = JSONArray(jsonResponse)
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    modulesList.add(
-                        ModuleEntity(
-                            moduleCode = obj.getString("module_code"),
-                            moduleName = obj.getString("module_name"),
-                            lecturerName = obj.getString("lecturer_name"),
-                            isFavourite = false
-                        )
-                    )
+
+                if (jsonArray.length() > 0) {
+                    val html = jsonArray.getJSONObject(0).getString("html_content")
+                    Log.d("LMS_DEBUG", "Successfully extracted HTML length: ${html.length}")
+                    return@withContext html
+                } else {
+                    Log.e("LMS_DEBUG", "No data found for $category with itemCode $itemCode.")
                 }
             } else {
-                Log.d("LMS_DEBUG", "Server returned error status code: $responseCode")
+                val errorStream = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                Log.e("LMS_DEBUG", "Server error for $category: $responseCode. Details: $errorStream")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("LMS_DEBUG", "Exception fetching $category", e)
         }
-        return@withContext modulesList
+        return@withContext null
     }
 }
