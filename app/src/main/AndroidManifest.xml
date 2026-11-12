@@ -3,13 +3,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- You will also need this permission for the alarms to work on newer Android versions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="UniFlow"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.UniFlow"
         android:usesCleartextTraffic="true">
@@ -37,7 +37,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Add the Receiver here -->
+        <!-- Receiver for alarms -->
         <receiver android:name=".ClassReminderReceiver" />
 
     </application>

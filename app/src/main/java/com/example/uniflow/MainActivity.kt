@@ -21,6 +21,8 @@ import com.microsoft.identity.client.*
 import com.microsoft.identity.client.exception.MsalException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -29,18 +31,29 @@ class MainActivity : ComponentActivity() {
         var mSingleAccountApp: ISingleAccountPublicClientApplication? = null
             private set
         var currentAccessToken: String? = null
+
+        // FIXED: Use StateFlow to guarantee UI updates
+        private val _currentUserName = MutableStateFlow<String?>(null)
+        val currentUserName: StateFlow<String?> = _currentUserName
+
+        private val _currentUserEmail = MutableStateFlow<String?>(null)
+        val currentUserEmail: StateFlow<String?> = _currentUserEmail
+
+        // Helper to update both at once
+        fun updateUserData(name: String?, email: String?) {
+            _currentUserName.value = name
+            _currentUserEmail.value = email
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d("MSAL_DEBUG", "MainActivity.onCreate started")
 
-        // Initialize the settings manager to load saved preferences
         SettingsManager.init(this)
 
         var startDestination by mutableStateOf<String?>(null)
 
-        // Initialize MSAL asynchronously on startup
         PublicClientApplication.createSingleAccountPublicClientApplication(
             this,
             R.raw.auth_config,
@@ -49,11 +62,17 @@ class MainActivity : ComponentActivity() {
                     mSingleAccountApp = application
                     Log.d("MSAL_DEBUG", "MSAL onCreated: Initialization successful. Instance assigned.")
 
-                    // Check if an account is already signed in
                     application.getCurrentAccountAsync(object : ISingleAccountPublicClientApplication.CurrentAccountCallback {
                         override fun onAccountLoaded(activeAccount: IAccount?) {
                             if (activeAccount != null) {
                                 val username = activeAccount.username
+
+                                // Update the StateFlow immediately
+                                updateUserData(
+                                    name = username.substringBefore("@").replaceFirstChar { it.uppercase() },
+                                    email = username
+                                )
+
                                 Log.d("MSAL_DEBUG", "Found active user session: $username")
 
                                 val silentParams = AcquireTokenSilentParameters.Builder()
@@ -119,10 +138,8 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            // Observe the dark mode setting state
             val isDarkMode by SettingsManager.isDarkMode.collectAsState()
 
-            // Apply the correct color scheme based on the toggle
             MaterialTheme(
                 colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
             ) {
@@ -133,8 +150,6 @@ class MainActivity : ComponentActivity() {
                     val destination = startDestination
                     if (destination != null) {
                         val navController = rememberNavController()
-
-                        // Use the dynamic destination instead of hardcoding SIGN_IN
                         AppNavHost(navController = navController, startDestination = destination)
                     }
                 }

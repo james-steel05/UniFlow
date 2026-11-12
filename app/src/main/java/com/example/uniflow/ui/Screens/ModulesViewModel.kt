@@ -8,7 +8,6 @@ import com.example.uniflow.data.local.ModuleEntity
 import com.example.uniflow.data.repository.ModuleRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
