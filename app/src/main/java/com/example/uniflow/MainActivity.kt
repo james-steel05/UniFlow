@@ -7,10 +7,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.uniflow.data.local.AppDatabase
+import com.example.uniflow.data.local.SettingsManager
 import com.example.uniflow.data.repository.ModuleRepository
 import com.example.uniflow.ui.AppNavHost
 import com.example.uniflow.ui.Routes
@@ -31,6 +34,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d("MSAL_DEBUG", "MainActivity.onCreate started")
+
+        // Initialize the settings manager to load saved preferences
+        SettingsManager.init(this)
 
         var startDestination by mutableStateOf<String?>(null)
 
@@ -57,17 +63,13 @@ class MainActivity : ComponentActivity() {
                                     .withCallback(object : SilentAuthenticationCallback {
                                         override fun onSuccess(authenticationResult: IAuthenticationResult) {
                                             val accessToken = authenticationResult.accessToken
-
-                                            // 2. Save the token globally
                                             currentAccessToken = accessToken
-
-                                            // 3. Move the user to the Timetable screen
                                             startDestination = Routes.TIMETABLE
 
                                             CoroutineScope(Dispatchers.IO).launch {
                                                 try {
                                                     val database = AppDatabase.getDatabase(applicationContext)
-                                                    val repository = ModuleRepository(database.moduleDao())
+                                                    val repository = ModuleRepository(database.moduleDao(), database.timetableDao())
                                                     repository.syncModulesFromLms(username, accessToken)
                                                 } catch (e: Exception) {
                                                     e.printStackTrace()
@@ -77,14 +79,12 @@ class MainActivity : ComponentActivity() {
 
                                         override fun onError(exception: MsalException) {
                                             Log.e("MSAL_DEBUG", "Silent token acquisition failed", exception)
-
-                                            // Even if the token fails, if they have an account, let them in
                                             startDestination = Routes.TIMETABLE
 
                                             CoroutineScope(Dispatchers.IO).launch {
                                                 try {
                                                     val database = AppDatabase.getDatabase(applicationContext)
-                                                    val repository = ModuleRepository(database.moduleDao())
+                                                    val repository = ModuleRepository(database.moduleDao(), database.timetableDao())
                                                     repository.syncModulesFromLms(username, null)
                                                 } catch (e: Exception) {
                                                     e.printStackTrace()
@@ -94,7 +94,6 @@ class MainActivity : ComponentActivity() {
                                     })
                                     .build()
 
-                                // Execute the silent request
                                 application.acquireTokenSilentAsync(silentParams)
 
                             } else {
@@ -120,15 +119,22 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            MaterialTheme {
+            // Observe the dark mode setting state
+            val isDarkMode by SettingsManager.isDarkMode.collectAsState()
+
+            // Apply the correct color scheme based on the toggle
+            MaterialTheme(
+                colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val destination = startDestination
-                    // 4. Only show the app once we know if they are logged in or not
                     if (destination != null) {
                         val navController = rememberNavController()
+
+                        // Use the dynamic destination instead of hardcoding SIGN_IN
                         AppNavHost(navController = navController, startDestination = destination)
                     }
                 }

@@ -17,7 +17,8 @@ interface ModuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertModules(modules: List<ModuleEntity>)
 
-    @Query("SELECT * FROM modules ORDER BY moduleCode ASC")
+    // Sorts favourites to the top, then sorts alphabetically
+    @Query("SELECT * FROM modules ORDER BY isFavourite DESC, moduleName ASC")
     fun getAllModules(): Flow<List<ModuleEntity>>
 
     @Query("SELECT * FROM modules WHERE moduleCode = :code")

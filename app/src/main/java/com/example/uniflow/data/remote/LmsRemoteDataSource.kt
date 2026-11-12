@@ -23,6 +23,7 @@ class LmsRemoteDataSource {
                 setRequestProperty("apikey", apiKey)
                 setRequestProperty("Authorization", "Bearer $apiKey")
 
+                // Pass the MSAL token to the backend if required
                 if (!idToken.isNullOrEmpty()) {
                     setRequestProperty("X-MSAL-Token", idToken)
                 }
@@ -46,7 +47,7 @@ class LmsRemoteDataSource {
                             moduleCode = obj.getString("module_code"),
                             moduleName = obj.getString("module_name"),
                             lecturerName = obj.getString("lecturer_name"),
-                            isFavourite = false
+                            isFavourite = false // Default, will be updated locally
                         )
                     )
                 }

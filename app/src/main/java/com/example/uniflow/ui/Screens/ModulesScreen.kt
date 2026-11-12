@@ -18,59 +18,45 @@ import com.example.uniflow.data.local.ModuleEntity
 import com.example.uniflow.ui.Routes
 import com.example.uniflow.ui.components.BottomBar
 
-// Added the OptIn annotation to fix the TopAppBar error
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModulesScreen(
     navController: NavHostController,
     viewModel: ModulesViewModel = viewModel()
 ) {
-    // Observe the database list and loading state
+    // Observe the database
     val modules by viewModel.modules.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Modules") }) },
         bottomBar = { BottomBar(navController, Routes.MODULES) }
     ) { padding ->
-        when {
-            isLoading -> {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+        if (modules.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("No modules found. Check your database connection.")
             }
-            modules.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Text(text = "No modules found for your account.", style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(modules, key = { it.moduleCode }) { module ->
-                        ModuleCard(
-                            module = module,
-                            onFavouriteClick = {
-                                viewModel.toggleFavourite(module.moduleCode, module.isFavourite)
-                            },
-                            // FIXED: Added the specific module code to the route
-                            onClick = {
-                                navController.navigate("module_detail/${module.moduleCode}")
-                            }
-                        )
-                    }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(modules, key = { it.moduleCode }) { module ->
+                    ModuleCard(
+                        module = module,
+                        onFavouriteClick = {
+                            // Toggle favorite in DB
+                            viewModel.toggleFavourite(module.moduleCode, module.isFavourite)
+                        },
+                        onClick = { navController.navigate("${Routes.MODULE_DETAIL}/${module.moduleCode}") }
+                    )
                 }
             }
         }
     }
 }
 
-// A helper Composable for the card
 @Composable
 fun ModuleCard(
     module: ModuleEntity,
@@ -88,8 +74,9 @@ fun ModuleCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "${module.moduleCode} - ${module.moduleName}", style = MaterialTheme.typography.titleMedium)
-                Text(text = module.lecturerName, style = MaterialTheme.typography.bodySmall)
+                Text(text = module.moduleName, style = MaterialTheme.typography.titleMedium)
+                Text(text = "Code: ${module.moduleCode}", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "Lecturer: ${module.lecturerName}", style = MaterialTheme.typography.bodySmall)
             }
             IconButton(onClick = onFavouriteClick) {
                 Icon(

@@ -22,7 +22,7 @@ class ModulesViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val database = AppDatabase.getDatabase(application)
-        repository = ModuleRepository(database.moduleDao())
+        repository = ModuleRepository(database.moduleDao(), database.timetableDao())
 
         modules = repository.allModules.stateIn(
             scope = viewModelScope,
@@ -30,16 +30,6 @@ class ModulesViewModel(application: Application) : AndroidViewModel(application)
             initialValue = emptyList()
         )
 
-        // Dummy data for testing if DB is empty
-        viewModelScope.launch {
-            if (repository.allModules.first().isEmpty()) {
-                repository.insertAll(listOf(
-                    ModuleEntity("ITMDA3-34", "Mobile Development", "Mr Tagutanazvo"),
-                    ModuleEntity("SAD3-22", "Systems Analysis", "Mrs Smith"),
-                    ModuleEntity("DBD3-12", "Database Design", "Mr Jones")
-                ))
-            }
-        }
     }
 
     // This function must exist for the Star icon to work
