@@ -6,10 +6,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
-import com.example.uniflow.MainActivity
-import com.example.uniflow.ui.screens.*
+import com.example.uniflow.ui.Screens.*
 
-// Wires every screen into the navigation graph with a dynamic start destination
 @Composable
 fun AppNavHost(navController: NavHostController, startDestination: String) {
     NavHost(navController = navController, startDestination = startDestination) {
@@ -23,9 +21,7 @@ fun AppNavHost(navController: NavHostController, startDestination: String) {
         }
 
         composable(Routes.PROFILE) {
-            ProfileScreen(
-                navController = navController,
-            )
+            ProfileScreen(navController = navController)
         }
 
         composable(Routes.MODULES) {
@@ -33,19 +29,11 @@ fun AppNavHost(navController: NavHostController, startDestination: String) {
         }
 
         composable(
-            route = "${Routes.MODULE_DETAIL}/{moduleCode}",
+            route = "module_detail/{moduleCode}",
             arguments = listOf(navArgument("moduleCode") { type = NavType.StringType })
         ) { backStackEntry ->
             val moduleCode = backStackEntry.arguments?.getString("moduleCode") ?: "Unknown"
-            ModuleDetailScreen(navController, moduleCode)
-        }
-
-        composable(
-            route = "${Routes.MODULE_DETAIL}/{moduleCode}",
-            arguments = listOf(navArgument("moduleCode") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val moduleCode = backStackEntry.arguments?.getString("moduleCode") ?: "Unknown"
-            ModuleDetailScreen(navController, moduleCode)
+            ModuleDetailScreen(navController = navController, moduleCode = moduleCode)
         }
     }
 }

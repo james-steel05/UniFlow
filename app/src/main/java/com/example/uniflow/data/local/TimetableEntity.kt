@@ -5,12 +5,12 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "timetable")
 data class TimetableEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0, // This fixes the 'id' error!
     val moduleCode: String,
     val moduleName: String,
-    val dayOfWeek: String, // e.g., "Monday"
-    val startTime: String, // e.g., "08:00"
-    val endTime: String,   // e.g., "10:00"
+    val dayOfWeek: String,
+    val startTime: String,
+    val endTime: String,
     val venue: String,
-    val reminderMinutes: Int = 30 // 60 for 1 hour, 30, or 10
+    val reminderMinutes: Int = 30
 )

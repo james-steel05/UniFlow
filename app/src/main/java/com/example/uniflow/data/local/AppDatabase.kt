@@ -5,12 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-// Added TimetableEntity to the database
-@Database(entities = [ModuleEntity::class, TimetableEntity::class], version = 2, exportSchema = false)
+// ADDED ModuleContentEntity to the list
+@Database(entities = [ModuleEntity::class, TimetableEntity::class, ModuleContentEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun moduleDao(): ModuleDao
-    abstract fun timetableDao(): TimetableDao // Added this
+    abstract fun timetableDao(): TimetableDao
 
     companion object {
         @Volatile
@@ -23,7 +23,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "uniflow_database"
                 )
-                    // Changed to version 2, fallback wipes old data to prevent crashes
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

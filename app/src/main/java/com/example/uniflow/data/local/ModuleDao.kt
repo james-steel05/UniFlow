@@ -7,7 +7,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
-
 @Dao
 interface ModuleDao {
 
@@ -35,4 +34,10 @@ interface ModuleDao {
 
     @Query("DELETE FROM modules")
     suspend fun deleteAllModules()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertModuleContent(content: ModuleContentEntity)
+
+    @Query("SELECT * FROM module_content WHERE moduleCode = :code")
+    suspend fun getModuleContent(code: String): ModuleContentEntity?
 }
